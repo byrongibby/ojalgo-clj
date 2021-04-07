@@ -103,7 +103,10 @@
 
   (get-2d [m row column])
 
-  (get-nd [m indexes])
+  (get-nd [m indexes]
+    (if (= 1 (count indexes))
+      (.get ^Array1D (.-array1d m) (long (first indexes)))
+      (throw (Exception. "Attempted to get index not consistent with vector type."))))
 
 
 
@@ -117,7 +120,12 @@
 
   (set-2d [m row column v])
 
-  (set-nd [m indexes v])
+  (set-nd [m indexes v]
+    (if (= 1 (count indexes))
+      (let [clone (.copy ^Array1D (.-array1d m))]
+        (.set clone (long (first indexes)) (double v))
+        (Vector. clone))
+      (throw (Exception. "Attempted to set index not consistent with vector type."))))
 
   (is-mutable? [m] true)
 
@@ -132,7 +140,11 @@
 
   (set-2d! [m row column v])
 
-  (set-nd! [m indexes v])
+  (set-nd! [m indexes v]
+    (if (= 1 (count indexes))
+      (.set ^Array1D (.-array1d m) 
+          (long (first indexes)) (double v))
+      (throw (Exception. "Attempted to set index not consistent with vector type."))))
 
 
 
@@ -254,7 +266,11 @@
   (get-2d [m row column] 
     (.get ^Primitive64Store (.-p64store m) (long row) (long column)))
 
-  (get-nd [m indexes])
+  (get-nd [m indexes]
+    (if (= 2 (count indexes))
+      (.get ^Primitive64Store (.-p64store m) 
+            (long (first indexes)) (long (second indexes)))
+      (throw (Exception. "Attempted to get index not consistent with matrix type."))))
 
 
 
@@ -268,7 +284,12 @@
             (.set clone (long row) (long column) (double v))
             (Matrix. clone)))
 
-  (set-nd [m indexes v])
+  (set-nd [m indexes v]
+    (if (= 2 (count indexes))
+      (let [clone (.copy ^Primitive64Store (.-p64store m))]
+        (.set clone (long (first indexes)) (long (second indexes)) (double v))
+        (Matrix. clone))
+      (throw (Exception. "Attempted to set index not consistent with matrix type."))))
 
   (is-mutable? [m] true)
 
@@ -283,7 +304,11 @@
     (.set ^Primitive64Store (.-p64store m) 
           (long row) (long column) (double v)))
 
-  (set-nd! [m indexes v])
+  (set-nd! [m indexes v]
+    (if (= 2 (count indexes))
+      (.set ^Primitive64Store (.-p64store m) 
+            (long (first indexes)) (long (second indexes)) (double v))
+      (throw (Exception. "Attempted to set index not consistent with matrix type."))))
 
 
 

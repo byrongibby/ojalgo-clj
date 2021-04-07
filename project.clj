@@ -9,6 +9,7 @@
   :source-paths ["src/clojure"]
   :java-source-paths ["src/java"]
   :target-path "target/%s"
+  :repl-options {:init-ns ojalgo-clj.core-test}
   :profiles {:dev {:dependencies [[net.mikera/vectorz-clj "0.48.0"]
                                   [net.mikera/core.matrix "0.62.0" :classifier "tests"]]}
              :test {:dependencies [[net.mikera/vectorz-clj "0.48.0"]

@@ -14,4 +14,15 @@
     (compliance-test (mat/array [[0 0] [0 0]])))) 
 
 
+(comment 
+  (def m (mat/array [[0 0] [0 0]]))
+  (def dims (mat/dimensionality m))
+  (def area (repeat dims 0))
+  (testing "select should match select-view"
+    (when (> (mat/ecount m) 0)
+      (let [area (repeat dims 0)]
+        (is (mat/e= (apply mat/select m area) 
+                    (apply mat/select-view m area))))))
 
+  (nth (mat/array [0 0]) 0)
+)
