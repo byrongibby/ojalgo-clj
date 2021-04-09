@@ -13,16 +13,22 @@
   (testing "Testing API compliance"
     (compliance-test (mat/array [[0 0] [0 0]])))) 
 
-
 (comment 
-  (def m (mat/array [[0 0] [0 0]]))
-  (def dims (mat/dimensionality m))
-  (def area (repeat dims 0))
-  (testing "select should match select-view"
-    (when (> (mat/ecount m) 0)
-      (let [area (repeat dims 0)]
-        (is (mat/e= (apply mat/select m area) 
-                    (apply mat/select-view m area))))))
+  (require '[clojure.core.matrix.protocols :as mp])
 
-  (nth (mat/array [0 0]) 0)
+  (def m (mat/array [[0 0] [-1 -1]]))
+  (def a (mat/array [[1 2] [3 4]]))
+
+  (mp/broadcast-compatible m a)
+
+  (mp/is-mutable? m)
+
+  (mp/element-map m clojure.core/- a)
+  (mp/element-map! m clojure.core/- a)
+
+  (mp/matrix-sub m a)
+  (mp/matrix-sub! m a) ;Why do you this! ????
+
+  *e
+
 )

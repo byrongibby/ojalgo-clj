@@ -1,7 +1,8 @@
 (ns ojalgo-clj.core
   (:require [clojure.core.matrix.implementations :as mi]
             [clojure.core.matrix.protocols :as mp])
-  (:import [org.ojalgo.array Array1D]
+  (:import [ojalgo-clj.lambda UnaryFn BinaryFn]
+           [org.ojalgo.array Array1D]
            [org.ojalgo.matrix.store MatrixStore$LogicalBuilder Primitive64Store]))
 
 
@@ -152,6 +153,37 @@
 
 
   (clone [m] (Vector. (.copy ^Array1D (.-array1d m))))
+
+
+
+  mp/PSliceView
+
+
+  (get-major-slice-view [m i]
+    (nth (seq m) i))
+
+
+
+  mp/PFunctionalOperations
+
+
+  (element-map!
+    [m f]
+    (.modifyAll (.-array1d m) (UnaryFn. f)))
+  (element-map!
+    [m f a]
+    (.modifyMatching (.-array1d m) (BinaryFn. f) (.-array1d a)))
+  (element-map!
+    [m f a more]
+    (.modifyMatching (.-array1d m) (BinaryFn. f) (.-array1d a))
+    (run! (.modifyMatching (.-array1d m) (BinaryFn. f) (.-array1d more)) more))
+
+
+
+  mp/PNumerical
+
+
+  (numerical? [m] true)
 )
 
 (defn create-vector [data]
@@ -316,6 +348,39 @@
 
 
   (clone [m] (Matrix. (.copy ^Primitive64Store (.-p64store m))))
+
+
+
+  mp/PSliceView
+
+
+  (get-major-slice-view [m i]
+    (nth (seq m) i))
+
+
+
+  mp/PFunctionalOperations
+
+
+  (element-map! [m f]
+    (.modifyAll (.-p64store m) (UnaryFn. f)))
+  (element-map! [m f a]
+    (-> (.operateOnMatching (.-p64store m) (BinaryFn. f) (.-p64store a))
+        (.supplyTo (.-p64store m))))
+  (element-map! [m f a more]
+    (loop [tmp (.operateOnMatching (.-p64store m) (BinaryFn. f) (.-p64store a))
+           b more]
+      (if (empty? b)
+        (.supplyTo (.-p64store m) tmp)
+        (recur (.operateOnMatching (.-p64store m) (BinaryFn. f) (.-p64store (first b)))
+               (next b)))))
+
+
+
+  mp/PNumerical
+
+
+  (numerical? [m] true)
 )
 
 (defn create-matrix [data]
