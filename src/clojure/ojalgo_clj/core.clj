@@ -167,16 +167,59 @@
   mp/PFunctionalOperations
 
 
+  (element-seq [m]
+    (Vector. (.copy (.-array1d m))))
+
+  (element-map
+    [m f]
+    (-> (.-array1d m)
+        (.copy)
+        (Vector.)
+        (mp/element-map! f)))
+  (element-map
+    [m f a]
+    (-> (.-array1d m)
+        (.copy)
+        (Vector.)
+        (mp/element-map! f a)))
+  (element-map
+    [m f a more]
+    (-> (.-array1d m)
+        (.copy)
+        (Vector.)
+        (mp/element-map! f a more)))
+
   (element-map!
     [m f]
-    (.modifyAll (.-array1d m) (UnaryFn. f)))
+    (.modifyAll (.-array1d m) (UnaryFn. f))
+    m)
   (element-map!
     [m f a]
-    (.modifyMatching (.-array1d m) (BinaryFn. f) (.-array1d a)))
+    (.modifyMatching (.-array1d m) 
+                     (BinaryFn. f) 
+                     (.-array1d (if (instance? Array1D a) 
+                                  a (create-vector (mp/convert-to-nested-vectors a)))))
+    m)
   (element-map!
     [m f a more]
-    (.modifyMatching (.-array1d m) (BinaryFn. f) (.-array1d a))
-    (run! (.modifyMatching (.-array1d m) (BinaryFn. f) (.-array1d more)) more))
+    (.modifyMatching (.-array1d m) 
+                     (BinaryFn. f) 
+                     (.-array1d (if (instance? Array1D a) 
+                                  a 
+                                  (create-vector (mp/convert-to-nested-vectors a)))))
+    (run! (.modifyMatching (.-array1d m) 
+                           (BinaryFn. f) 
+                           (.-array1d (if (instance? Array1D more) 
+                                        more (create-vector (mp/convert-to-nested-vectors more))))) 
+          more)
+    m)
+
+  (element-reduce
+    [m f]
+    (reduce f (mp/element-seq m)))
+  (element-reduce
+    [m f init]
+    (reduce f (double init) (mp/element-seq m)))
 
 
 
@@ -222,7 +265,7 @@
           ^MatrixStore$LogicalBuilder (.row (int-array [row-index]))
           (.copy)
           (.asList)
-          ^Vector (create-vector))))
+          ^Vector (Vector.))))
 
   (first [^Matrix this]
     (first (seq this)))
@@ -362,18 +405,64 @@
   mp/PFunctionalOperations
 
 
+
+  (element-seq [m]
+    (-> (.-p64store m)
+        (.transpose)
+        (.copy)
+        (.asList)
+        (Vector.)))
+
+  (element-map
+    [m f]
+    (-> (.-p64store m)
+        (.copy)
+        (Matrix.)
+        (mp/element-map! f)))
+  (element-map
+    [m f a]
+    (-> (.-p64store m)
+        (.copy)
+        (Matrix.)
+        (mp/element-map! f a)))
+  (element-map
+    [m f a more]
+    (-> (.-p64store m)
+        (.copy)
+        (Matrix.)
+        (mp/element-map! f a more)))
+
   (element-map! [m f]
-    (.modifyAll (.-p64store m) (UnaryFn. f)))
+    (.modifyAll (.-p64store m) (UnaryFn. f))
+    m)
   (element-map! [m f a]
-    (-> (.operateOnMatching (.-p64store m) (BinaryFn. f) (.-p64store a))
-        (.supplyTo (.-p64store m))))
+      (-> (.operateOnMatching (.-p64store m) 
+                              (BinaryFn. f) 
+                              (.-p64store (if (instance? Primitive64Store a) 
+                                            a (create-matrix (mp/convert-to-nested-vectors a)))))
+          (.supplyTo (.-p64store m)))
+      m)
   (element-map! [m f a more]
-    (loop [tmp (.operateOnMatching (.-p64store m) (BinaryFn. f) (.-p64store a))
+    (loop [tmp (.operateOnMatching (.-p64store m) 
+                                   (BinaryFn. f) 
+                                   (.-p64store (if (instance? Primitive64Store a) 
+                                                 a (create-matrix (mp/convert-to-nested-vectors a)))))
            b more]
       (if (empty? b)
         (.supplyTo (.-p64store m) tmp)
-        (recur (.operateOnMatching (.-p64store m) (BinaryFn. f) (.-p64store (first b)))
-               (next b)))))
+        (recur (.operateOnMatching (.-p64store m) 
+                                   (BinaryFn. f) 
+                                   (.-p64store (if (instance? Primitive64Store (first b)) 
+                                                 (first b) (create-matrix (mp/convert-to-nested-vectors (first b))))))
+               (next b))))
+    m)
+
+  (element-reduce
+    [m f]
+    (reduce f (mp/element-seq m)))
+  (element-reduce
+    [m f init]
+    (reduce f (double init) (mp/element-seq m)))
 
 
 
