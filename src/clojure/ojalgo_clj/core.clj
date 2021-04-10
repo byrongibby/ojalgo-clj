@@ -436,24 +436,45 @@
     (.modifyAll (.-p64store m) (UnaryFn. f))
     m)
   (element-map! [m f a]
-      (-> (.operateOnMatching (.-p64store m) 
-                              (BinaryFn. f) 
-                              (.-p64store (if (instance? Primitive64Store a) 
-                                            a (create-matrix (mp/convert-to-nested-vectors a)))))
+    (-> (.operateOnMatching (.-p64store m) 
+                            (BinaryFn. f) 
+                            (.-p64store 
+                              (if (= (mp/get-shape m) (mp/get-shape a)) 
+                                (if (instance? Primitive64Store a) 
+                                  a 
+                                  (create-matrix (mp/convert-to-nested-vectors a)))
+                                (-> (mp/broadcast-compatible m a)
+                                    second
+                                    mp/convert-to-nested-vectors
+                                    create-matrix))))
           (.supplyTo (.-p64store m)))
       m)
   (element-map! [m f a more]
     (loop [tmp (.operateOnMatching (.-p64store m) 
                                    (BinaryFn. f) 
-                                   (.-p64store (if (instance? Primitive64Store a) 
-                                                 a (create-matrix (mp/convert-to-nested-vectors a)))))
+                                   (.-p64store 
+                                     (if (= (mp/get-shape m) (mp/get-shape a)) 
+                                       (if (instance? Primitive64Store a) 
+                                         a 
+                                         (create-matrix (mp/convert-to-nested-vectors a)))
+                                       (-> (mp/broadcast-compatible m a)
+                                           second
+                                           mp/convert-to-nested-vectors
+                                           create-matrix))))
            b more]
       (if (empty? b)
         (.supplyTo (.-p64store m) tmp)
         (recur (.operateOnMatching (.-p64store m) 
                                    (BinaryFn. f) 
-                                   (.-p64store (if (instance? Primitive64Store (first b)) 
-                                                 (first b) (create-matrix (mp/convert-to-nested-vectors (first b))))))
+                                   (.-p64store 
+                                     (if (= (mp/get-shape m) (mp/get-shape (first b))) 
+                                       (if (instance? Primitive64Store (first b)) 
+                                         (first b) 
+                                         (create-matrix (mp/convert-to-nested-vectors (first b))))
+                                       (-> (mp/broadcast-compatible m (first b))
+                                           second
+                                           mp/convert-to-nested-vectors
+                                           create-matrix))))
                (next b))))
     m)
 
@@ -470,6 +491,44 @@
 
 
   (numerical? [m] true)
+
+
+
+  mp/PMatrixMultiplyMutable
+
+
+  (matrix-multiply! [m a]
+    (if (instance? Primitive64Store a)
+      (.multiply (.-p64store m) (.-p64store a) (.-p64store m))
+      (let [a (create-matrix (mp/convert-to-nested-vectors a))]
+        (.multiply (.-p64store m) (.-p64store a) (.-p64store m))))
+    m)
+
+  (element-multiply! [m a]
+    (mp/element-map! m clojure.core/* a))
+
+
+
+  mp/PAssignment
+
+
+  (assign!
+    [m source]
+    (let [[m a] (mp/broadcast-compatible m source)]
+      (.supplyTo (.-p64store (create-matrix (mp/convert-to-nested-vectors a))) 
+                 (.-p64store m)))
+    m)
+  (assign-array!
+    [m arr]
+    (.fillMatching (.-p64store m) (.-array1d (create-vector (into [] arr))))
+    (.supplyTo (.copy (.transpose (.-p64store m))) (.-p64store m))
+    m)
+  (assign-array!
+    [m arr start length]
+    (let [arr (subvec arr start (last (take (inc length) (iterate inc start))))]
+      (.fillMatching (.-p64store m) (.-array1d (create-vector (into [] arr))))
+      (.supplyTo (.copy (.transpose (.-p64store m))) (.-p64store m)))
+    m)
 )
 
 (defn create-matrix [data]
