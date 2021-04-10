@@ -1,6 +1,6 @@
 # ojalgo-clj
 
-Clojure core.matrix implementation of oj! Algorithm 
+Clojure [core.matrix](https://github.com/mikera/core.matrix) implementation of [oj! Algorithm](https://www.ojalgo.org/) 
 
 ## License
 
