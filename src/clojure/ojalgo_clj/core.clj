@@ -1,7 +1,7 @@
 (ns ojalgo-clj.core
   (:require [clojure.core.matrix.implementations :as mi]
             [clojure.core.matrix.protocols :as mp])
-  (:import [ojalgo-clj.lambda UnaryFn BinaryFn]
+  (:import [ojalgo-clj.function UnaryFn BinaryFn]
            [org.ojalgo.array Array1D]
            [org.ojalgo.matrix.store MatrixStore$LogicalBuilder Primitive64Store]))
 
@@ -204,38 +204,7 @@
 ;; Matrix type
 
 
-(deftype Matrix [^Primitive64Store p64store]
-
-
-
-  Object
-
-
-  (toString [this]
-    (->> (.toString (.-p64store this))
-         (re-find #"(?is)< \d+ x \d+ >.*" )
-         (str "#"  `Matrix " " )))
-
-
-
-  clojure.lang.ISeq
-
-
-  (seq [^Matrix m]
-    (for [row-index (range (.countRows ^Primitive64Store (.-p64store m)))]
-      (-> (.logical ^Primitive64Store (.-p64store m))
-          ^MatrixStore$LogicalBuilder (.row (int-array [row-index]))
-          (.copy)
-          ^Array1D (.asList))))
-
-  (first [^Matrix this]
-    (first (seq this)))
-
-  (next [^Matrix this]
-    (next (seq this)))
-
-  (cons [item this]
-    (cons item (seq this)))
+(extend-type Primitive64Store
 
 
 
@@ -279,8 +248,8 @@
   (dimensionality [m] 2)
 
   (get-shape [m] 
-    [(.countRows ^Primitive64Store (.-p64store m)) 
-     (.countColumns ^Primitive64Store (.-p64store m))])
+    [(.countRows ^Primitive64Store m) 
+     (.countColumns ^Primitive64Store m)])
 
   (is-scalar? [m] false)
 
@@ -288,8 +257,8 @@
 
   (dimension-count [m dimension-number]
     (case (int dimension-number)
-      0 (.countRows ^Primitive64Store (.-p64store m))
-      1 (.countColumns ^Primitive64Store (.-p64store m))
+      0 (.countRows ^Primitive64Store m)
+      1 (.countColumns ^Primitive64Store m)
       (throw (Exception. "Dimension not supported."))))
 
 
@@ -300,11 +269,11 @@
   (get-1d [m row])
 
   (get-2d [m row column] 
-    (.get ^Primitive64Store (.-p64store m) (long row) (long column)))
+    (.get ^Primitive64Store m (long row) (long column)))
 
   (get-nd [m indexes]
     (if (= 2 (count indexes))
-      (.get ^Primitive64Store (.-p64store m) 
+      (.get ^Primitive64Store m 
             (long (first indexes)) (long (second indexes)))
       (throw (Exception. "Attempted to get index not consistent with matrix type."))))
 
@@ -316,15 +285,15 @@
   (set-1d [m row v])
 
   (set-2d [m row column v]
-          (let [clone (.copy ^Primitive64Store (.-p64store m))]
+          (let [clone (.copy ^Primitive64Store m)]
             (.set clone (long row) (long column) (double v))
-            (Matrix. clone)))
+            clone))
 
   (set-nd [m indexes v]
     (if (= 2 (count indexes))
-      (let [clone (.copy ^Primitive64Store (.-p64store m))]
+      (let [clone (.copy ^Primitive64Store m)]
         (.set clone (long (first indexes)) (long (second indexes)) (double v))
-        (Matrix. clone))
+        clone)
       (throw (Exception. "Attempted to set index not consistent with matrix type."))))
 
   (is-mutable? [m] true)
@@ -337,12 +306,12 @@
   (set-1d! [m row v])
 
   (set-2d! [m row column v] 
-    (.set ^Primitive64Store (.-p64store m) 
+    (.set ^Primitive64Store m 
           (long row) (long column) (double v)))
 
   (set-nd! [m indexes v]
     (if (= 2 (count indexes))
-      (.set ^Primitive64Store (.-p64store m) 
+      (.set ^Primitive64Store m 
             (long (first indexes)) (long (second indexes)) (double v))
       (throw (Exception. "Attempted to set index not consistent with matrix type."))))
 
@@ -351,7 +320,7 @@
   mp/PMatrixCloning
 
 
-  (clone [m] (Matrix. (.copy ^Primitive64Store (.-p64store m))))
+  (clone [m] (.copy ^Primitive64Store m))
 
 
 
@@ -366,78 +335,73 @@
   mp/PFunctionalOperations
 
 
-
   (element-seq [m]
-    (-> (.-p64store m)
+    (-> m
         (.transpose)
         (.copy)
         ^Array1D (.asList)))
 
   (element-map
-    [m f]
-    (let [m-new (Matrix. (.copy (.-p64store m)))]
-      (mp/element-map! m-new f)
-      m-new))
-  (element-map
-    [m f a]
-    (let [m-new (Matrix. (.copy (.-p64store m)))]
-      (mp/element-map! m-new f a)
-      m-new))
-  (element-map
-    [m f a more]
-    (let [m-new (Matrix. (.copy (.-p64store m)))]
-      (mp/element-map! m-new f a more)
-      m-new))
+    ([m f]
+     (let [m-new (.copy m)]
+       (mp/element-map! m-new f)
+       m-new))
+    ([m f a]
+     (let [m-new (.copy m)]
+       (mp/element-map! m-new f a)
+       m-new))
+    ([m f a more]
+     (let [m-new (.copy m)]
+       (mp/element-map! m-new f a more)
+       m-new)))
 
-  (element-map! [m f]
-    (.modifyAll (.-p64store m) (UnaryFn. f)))
-  (element-map! [m f a]
-    (-> (.operateOnMatching (.-p64store m) 
-                            (BinaryFn. f) 
-                            (.-p64store 
-                              (if (= (mp/get-shape m) (mp/get-shape a)) 
-                                (if (instance? Primitive64Store a) 
-                                  a 
-                                  (create-matrix (mp/convert-to-nested-vectors a)))
-                                (-> (mp/broadcast-compatible m a)
-                                    second
-                                    mp/convert-to-nested-vectors
-                                    create-matrix))))
-          (.supplyTo (.-p64store m))))
-  (element-map! [m f a more]
-    (loop [tmp (.operateOnMatching (.-p64store m) 
-                                   (BinaryFn. f) 
-                                   (.-p64store 
-                                     (if (= (mp/get-shape m) (mp/get-shape a)) 
-                                       (if (instance? Primitive64Store a) 
-                                         a 
-                                         (create-matrix (mp/convert-to-nested-vectors a)))
-                                       (-> (mp/broadcast-compatible m a)
-                                           second
-                                           mp/convert-to-nested-vectors
-                                           create-matrix))))
-           b more]
-      (if (empty? b)
-        (.supplyTo (.-p64store m) tmp)
-        (recur (.operateOnMatching (.-p64store m) 
-                                   (BinaryFn. f) 
-                                   (.-p64store 
-                                     (if (= (mp/get-shape m) (mp/get-shape (first b))) 
-                                       (if (instance? Primitive64Store (first b)) 
-                                         (first b) 
-                                         (create-matrix (mp/convert-to-nested-vectors (first b))))
-                                       (-> (mp/broadcast-compatible m (first b))
-                                           second
-                                           mp/convert-to-nested-vectors
-                                           create-matrix))))
-               (next b)))))
+  (element-map! 
+    ([m f]
+     (.modifyAll m (UnaryFn. f)))
+    ([m f a]
+     (-> (.operateOnMatching m 
+                             (BinaryFn. f) 
+                             (if (= (mp/get-shape m) (mp/get-shape a)) 
+                               (if (instance? Primitive64Store a) 
+                                 a 
+                                 (create-matrix (mp/convert-to-nested-vectors a)))
+                               (-> (mp/broadcast-compatible m a)
+                                   second
+                                   mp/convert-to-nested-vectors
+                                   create-matrix)))
+         (.supplyTo m)))
+    ([m f a more]
+     (loop [tmp (.operateOnMatching m 
+                                    (BinaryFn. f) 
+                                    (if (= (mp/get-shape m) (mp/get-shape a)) 
+                                      (if (instance? Primitive64Store a) 
+                                        a 
+                                        (create-matrix (mp/convert-to-nested-vectors a)))
+                                      (-> (mp/broadcast-compatible m a)
+                                          second
+                                          mp/convert-to-nested-vectors
+                                          create-matrix)))
+            b more]
+       (if (empty? b)
+         (.supplyTo m tmp)
+         (recur (.operateOnMatching m 
+                                    (BinaryFn. f) 
+                                    (if (= (mp/get-shape m) (mp/get-shape (first b))) 
+                                      (if (instance? Primitive64Store (first b)) 
+                                        (first b) 
+                                        (create-matrix (mp/convert-to-nested-vectors (first b))))
+                                      (-> (mp/broadcast-compatible m (first b))
+                                          second
+                                          mp/convert-to-nested-vectors
+                                          create-matrix)))
+                (next b))))))
 
   (element-reduce
-    [m f]
-    (reduce f (mp/element-seq m)))
-  (element-reduce
-    [m f init]
-    (reduce f (double init) (mp/element-seq m)))
+    ([m f]
+     (reduce f (mp/element-seq m)))
+    ([m f init]
+     (reduce f (double init) (mp/element-seq m))))
+  
 
 
 
@@ -453,9 +417,9 @@
 
   (matrix-multiply! [m a]
     (if (instance? Primitive64Store a)
-      (.multiply (.-p64store m) (.-p64store a) (.-p64store m))
+      (.multiply m a m)
       (let [a (create-matrix (mp/convert-to-nested-vectors a))]
-        (.multiply (.-p64store m) (.-p64store a) (.-p64store m)))))
+        (.multiply m a m))))
 
   (element-multiply! [m a]
     (mp/element-map! m clojure.core/* a))
@@ -468,17 +432,16 @@
   (assign!
     [m source]
     (let [[m a] (mp/broadcast-compatible m source)]
-      (.supplyTo (.-p64store (create-matrix (mp/convert-to-nested-vectors a))) 
-                 (.-p64store m))))
+      (.supplyTo (create-matrix (mp/convert-to-nested-vectors a)) 
+                 m)))
   (assign-array!
-    [m arr]
-    (.fillMatching (.-p64store m) (create-vector (into [] arr)))
-    (.supplyTo (.copy (.transpose (.-p64store m))) (.-p64store m)))
-  (assign-array!
-    [m arr start length]
-    (let [arr (subvec arr start (last (take (inc length) (iterate inc start))))]
-      (.fillMatching (.-p64store m) (create-vector (into [] arr)))
-      (.supplyTo (.copy (.transpose (.-p64store m))) (.-p64store m))))
+    ([m arr]
+     (.fillMatching m (create-vector (into [] arr)))
+     (.supplyTo (.copy (.transpose m)) m))
+    ([m arr start length]
+     (let [arr (subvec arr start (last (take (inc length) (iterate inc start))))]
+       (.fillMatching m (create-vector (into [] arr)))
+       (.supplyTo (.copy (.transpose m)) m))))
 )
 
 (defn create-matrix [data]
@@ -488,8 +451,7 @@
     (->> data 
          (map double-array)
          into-array
-         (.rows Primitive64Store/FACTORY)
-         (Matrix.))))
+         (.rows Primitive64Store/FACTORY))))
 
 
 
@@ -497,21 +459,25 @@
 
 (defmethod print-dup Array1D 
   ([^Array1D m ^java.io.Writer w]
-   (.write w ^java.lang.String 
-           (str "#ojalgo-clj.core/vector " (.toString m)))))
+   (.write w ^java.lang.String (str "#ojalgo-clj.core/vector " 
+                                    (.toString m)))))
 
 (defmethod print-method Array1D 
   ([^Array1D m ^java.io.Writer w]
-   (.write w ^java.lang.String 
-           (str "#ojalgo-clj.core/vector " (.toString m)))))
+   (.write w ^java.lang.String (str "#ojalgo-clj.core/vector " 
+                                    (.toString m)))))
 
-(defmethod print-dup ojalgo_clj.core.Matrix 
-  ([^Matrix m ^java.io.Writer w]
-   (.write w ^java.lang.String (.toString m))))
+(defmethod print-dup Primitive64Store 
+  ([^Primitive64Store m ^java.io.Writer w]
+   (.write w ^java.lang.String (->> (.toString m)
+                                    (re-find #"(?is)< \d+ x \d+ >.*" )
+                                    (str "#ojalgo-clj.core/matrix ")))))
 
-(defmethod print-method ojalgo_clj.core.Matrix 
-  ([^Matrix m ^java.io.Writer w]
-   (.write w ^java.lang.String (.toString m))))
+(defmethod print-method Primitive64Store 
+  ([^Primitive64Store m ^java.io.Writer w]
+   (.write w ^java.lang.String (->> (.toString m)
+                                    (re-find #"(?is)< \d+ x \d+ >.*" )
+                                    (str "#ojalgo-clj.core/matrix ")))))
 
 
 

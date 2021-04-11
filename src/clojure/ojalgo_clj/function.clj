@@ -1,7 +1,7 @@
-(ns ojalgo-clj.lambda)
+(ns ojalgo-clj.function)
 
 (gen-class 
-  :name ojalgo-clj.lambda.UnaryFn
+  :name ojalgo-clj.function.UnaryFn
   :prefix UnaryFn-
   :implements [org.ojalgo.function.UnaryFunction]
   :state state
@@ -16,7 +16,7 @@
   ((.state this) arg))
 
 (gen-class 
-  :name ojalgo-clj.lambda.BinaryFn
+  :name ojalgo-clj.function.BinaryFn
   :prefix BinaryFn-
   :implements [org.ojalgo.function.BinaryFunction]
   :state state
