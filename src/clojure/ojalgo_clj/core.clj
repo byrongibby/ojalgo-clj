@@ -172,34 +172,29 @@
 
   (element-map
     [m f]
-    (-> (.-array1d m)
-        (.copy)
-        (Vector.)
-        (mp/element-map! f)))
+    (let [m-new (Vector. (.copy (.-array1d m)))]
+      (mp/element-map! m-new f)
+      m-new))
   (element-map
     [m f a]
-    (-> (.-array1d m)
-        (.copy)
-        (Vector.)
-        (mp/element-map! f a)))
+    (let [m-new (Vector. (.copy (.-array1d m)))]
+      (mp/element-map! m-new f a)
+      m-new))
   (element-map
     [m f a more]
-    (-> (.-array1d m)
-        (.copy)
-        (Vector.)
-        (mp/element-map! f a more)))
+    (let [m-new (Vector. (.copy (.-array1d m)))]
+      (mp/element-map! m-new f a more)
+      m-new))
 
   (element-map!
     [m f]
-    (.modifyAll (.-array1d m) (UnaryFn. f))
-    m)
+    (.modifyAll (.-array1d m) (UnaryFn. f)))
   (element-map!
     [m f a]
     (.modifyMatching (.-array1d m) 
                      (BinaryFn. f) 
                      (.-array1d (if (instance? Array1D a) 
-                                  a (create-vector (mp/convert-to-nested-vectors a)))))
-    m)
+                                  a (create-vector (mp/convert-to-nested-vectors a))))))
   (element-map!
     [m f a more]
     (.modifyMatching (.-array1d m) 
@@ -211,8 +206,7 @@
                            (BinaryFn. f) 
                            (.-array1d (if (instance? Array1D more) 
                                         more (create-vector (mp/convert-to-nested-vectors more))))) 
-          more)
-    m)
+          more))
 
   (element-reduce
     [m f]
@@ -415,26 +409,22 @@
 
   (element-map
     [m f]
-    (-> (.-p64store m)
-        (.copy)
-        (Matrix.)
-        (mp/element-map! f)))
+    (let [m-new (Matrix. (.copy (.-p64store m)))]
+      (mp/element-map! m-new f)
+      m-new))
   (element-map
     [m f a]
-    (-> (.-p64store m)
-        (.copy)
-        (Matrix.)
-        (mp/element-map! f a)))
+    (let [m-new (Matrix. (.copy (.-p64store m)))]
+      (mp/element-map! m-new f a)
+      m-new))
   (element-map
     [m f a more]
-    (-> (.-p64store m)
-        (.copy)
-        (Matrix.)
-        (mp/element-map! f a more)))
+    (let [m-new (Matrix. (.copy (.-p64store m)))]
+      (mp/element-map! m-new f a more)
+      m-new))
 
   (element-map! [m f]
-    (.modifyAll (.-p64store m) (UnaryFn. f))
-    m)
+    (.modifyAll (.-p64store m) (UnaryFn. f)))
   (element-map! [m f a]
     (-> (.operateOnMatching (.-p64store m) 
                             (BinaryFn. f) 
@@ -447,8 +437,7 @@
                                     second
                                     mp/convert-to-nested-vectors
                                     create-matrix))))
-          (.supplyTo (.-p64store m)))
-      m)
+          (.supplyTo (.-p64store m))))
   (element-map! [m f a more]
     (loop [tmp (.operateOnMatching (.-p64store m) 
                                    (BinaryFn. f) 
@@ -475,8 +464,7 @@
                                            second
                                            mp/convert-to-nested-vectors
                                            create-matrix))))
-               (next b))))
-    m)
+               (next b)))))
 
   (element-reduce
     [m f]
@@ -501,8 +489,7 @@
     (if (instance? Primitive64Store a)
       (.multiply (.-p64store m) (.-p64store a) (.-p64store m))
       (let [a (create-matrix (mp/convert-to-nested-vectors a))]
-        (.multiply (.-p64store m) (.-p64store a) (.-p64store m))))
-    m)
+        (.multiply (.-p64store m) (.-p64store a) (.-p64store m)))))
 
   (element-multiply! [m a]
     (mp/element-map! m clojure.core/* a))
@@ -516,19 +503,16 @@
     [m source]
     (let [[m a] (mp/broadcast-compatible m source)]
       (.supplyTo (.-p64store (create-matrix (mp/convert-to-nested-vectors a))) 
-                 (.-p64store m)))
-    m)
+                 (.-p64store m))))
   (assign-array!
     [m arr]
     (.fillMatching (.-p64store m) (.-array1d (create-vector (into [] arr))))
-    (.supplyTo (.copy (.transpose (.-p64store m))) (.-p64store m))
-    m)
+    (.supplyTo (.copy (.transpose (.-p64store m))) (.-p64store m)))
   (assign-array!
     [m arr start length]
     (let [arr (subvec arr start (last (take (inc length) (iterate inc start))))]
       (.fillMatching (.-p64store m) (.-array1d (create-vector (into [] arr))))
-      (.supplyTo (.copy (.transpose (.-p64store m))) (.-p64store m)))
-    m)
+      (.supplyTo (.copy (.transpose (.-p64store m))) (.-p64store m))))
 )
 
 (defn create-matrix [data]
