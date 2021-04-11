@@ -15,33 +15,7 @@
 ;; Vector type
 
 
-(deftype Vector [^Array1D array1d]
-
-
-
-  Object
-
-
-  (toString [this]
-    (->> (.toString (.-array1d this))
-         (str "#"  `Vector " " )))
-
-
-
-  clojure.lang.ISeq
-
-
-  (seq [^Vector m]
-    (seq (.-array1d m)))
-
-  (first [^Vector this]
-    (first (seq this)))
-
-  (next [^Vector this]
-    (next (seq this)))
-
-  (cons [item this]
-    (cons item (seq this)))
+(extend-type Array1D
 
 
 
@@ -84,7 +58,7 @@
 
   (dimensionality [m] 1)
 
-  (get-shape [m] [(.size ^Array1D (.-array1d m))])
+  (get-shape [m] [(.size ^Array1D m)])
 
   (is-scalar? [m] false)
 
@@ -92,7 +66,7 @@
 
   (dimension-count [m dimension-number]
     (case (int dimension-number)
-      0 (.size ^Array1D (.-array1d m))
+      0 (.size ^Array1D m)
       (throw (Exception. "Dimension not supported."))))
 
 
@@ -100,13 +74,13 @@
   mp/PIndexedAccess
 
 
-  (get-1d [m row] (.get ^Array1D (.-array1d m) (long row)))
+  (get-1d [m row] (.get ^Array1D m (long row)))
 
   (get-2d [m row column])
 
   (get-nd [m indexes]
     (if (= 1 (count indexes))
-      (.get ^Array1D (.-array1d m) (long (first indexes)))
+      (.get ^Array1D m (long (first indexes)))
       (throw (Exception. "Attempted to get index not consistent with vector type."))))
 
 
@@ -115,17 +89,17 @@
 
 
   (set-1d [m row v]
-    (let [clone (.copy ^Array1D (.-array1d m))]
+    (let [clone (.copy ^Array1D m)]
       (.set clone (long row) (double v))
-      (Vector. clone)))
+      clone))
 
   (set-2d [m row column v])
 
   (set-nd [m indexes v]
     (if (= 1 (count indexes))
-      (let [clone (.copy ^Array1D (.-array1d m))]
+      (let [clone (.copy ^Array1D m)]
         (.set clone (long (first indexes)) (double v))
-        (Vector. clone))
+        clone)
       (throw (Exception. "Attempted to set index not consistent with vector type."))))
 
   (is-mutable? [m] true)
@@ -136,14 +110,14 @@
 
 
   (set-1d! [m row v]
-    (.set ^Array1D (.-array1d m) 
+    (.set ^Array1D m 
           (long row) (double v)))
 
   (set-2d! [m row column v])
 
   (set-nd! [m indexes v]
     (if (= 1 (count indexes))
-      (.set ^Array1D (.-array1d m) 
+      (.set ^Array1D m 
           (long (first indexes)) (double v))
       (throw (Exception. "Attempted to set index not consistent with vector type."))))
 
@@ -152,7 +126,7 @@
   mp/PMatrixCloning
 
 
-  (clone [m] (Vector. (.copy ^Array1D (.-array1d m))))
+  (clone [m] (.copy ^Array1D m))
 
 
 
@@ -168,52 +142,47 @@
 
 
   (element-seq [m]
-    (Vector. (.copy (.-array1d m))))
+    (.copy m))
 
   (element-map
-    [m f]
-    (let [m-new (Vector. (.copy (.-array1d m)))]
-      (mp/element-map! m-new f)
-      m-new))
-  (element-map
-    [m f a]
-    (let [m-new (Vector. (.copy (.-array1d m)))]
-      (mp/element-map! m-new f a)
-      m-new))
-  (element-map
-    [m f a more]
-    (let [m-new (Vector. (.copy (.-array1d m)))]
-      (mp/element-map! m-new f a more)
-      m-new))
+    ([m f]
+     (let [m-new (.copy m)]
+       (mp/element-map! m-new f)
+       m-new))
+    ([m f a]
+     (let [m-new (.copy m)]
+       (mp/element-map! m-new f a)
+       m-new))
+    ([m f a more]
+     (let [m-new (.copy m)]
+       (mp/element-map! m-new f a more)
+       m-new)))
 
   (element-map!
-    [m f]
-    (.modifyAll (.-array1d m) (UnaryFn. f)))
-  (element-map!
-    [m f a]
-    (.modifyMatching (.-array1d m) 
-                     (BinaryFn. f) 
-                     (.-array1d (if (instance? Array1D a) 
-                                  a (create-vector (mp/convert-to-nested-vectors a))))))
-  (element-map!
-    [m f a more]
-    (.modifyMatching (.-array1d m) 
-                     (BinaryFn. f) 
-                     (.-array1d (if (instance? Array1D a) 
-                                  a 
-                                  (create-vector (mp/convert-to-nested-vectors a)))))
-    (run! (.modifyMatching (.-array1d m) 
-                           (BinaryFn. f) 
-                           (.-array1d (if (instance? Array1D more) 
-                                        more (create-vector (mp/convert-to-nested-vectors more))))) 
-          more))
+    ([m f]
+     (.modifyAll m (UnaryFn. f)))
+    ([m f a]
+     (.modifyMatching m 
+                      (BinaryFn. f) 
+                      (if (instance? Array1D a) 
+                        a (create-vector (mp/convert-to-nested-vectors a)))))
+    ([m f a more]
+     (.modifyMatching m 
+                      (BinaryFn. f) 
+                      (if (instance? Array1D a) 
+                        a 
+                        (create-vector (mp/convert-to-nested-vectors a))))
+     (run! (.modifyMatching m 
+                            (BinaryFn. f) 
+                            (if (instance? Array1D more) 
+                              more (create-vector (mp/convert-to-nested-vectors more)))) 
+           more)))
 
   (element-reduce
-    [m f]
+    ([m f]
     (reduce f (mp/element-seq m)))
-  (element-reduce
-    [m f init]
-    (reduce f (double init) (mp/element-seq m)))
+    ([m f init]
+     (reduce f (double init) (mp/element-seq m))))
 
 
 
@@ -228,8 +197,7 @@
              (every? number? data))
     (->> data 
          double-array
-         (.copy Array1D/PRIMITIVE64)
-         (Vector.))))
+         (.copy Array1D/PRIMITIVE64))))
 
 
 
@@ -258,8 +226,7 @@
       (-> (.logical ^Primitive64Store (.-p64store m))
           ^MatrixStore$LogicalBuilder (.row (int-array [row-index]))
           (.copy)
-          (.asList)
-          ^Vector (Vector.))))
+          ^Array1D (.asList))))
 
   (first [^Matrix this]
     (first (seq this)))
@@ -404,8 +371,7 @@
     (-> (.-p64store m)
         (.transpose)
         (.copy)
-        (.asList)
-        (Vector.)))
+        ^Array1D (.asList)))
 
   (element-map
     [m f]
@@ -506,12 +472,12 @@
                  (.-p64store m))))
   (assign-array!
     [m arr]
-    (.fillMatching (.-p64store m) (.-array1d (create-vector (into [] arr))))
+    (.fillMatching (.-p64store m) (create-vector (into [] arr)))
     (.supplyTo (.copy (.transpose (.-p64store m))) (.-p64store m)))
   (assign-array!
     [m arr start length]
     (let [arr (subvec arr start (last (take (inc length) (iterate inc start))))]
-      (.fillMatching (.-p64store m) (.-array1d (create-vector (into [] arr))))
+      (.fillMatching (.-p64store m) (create-vector (into [] arr)))
       (.supplyTo (.copy (.transpose (.-p64store m))) (.-p64store m))))
 )
 
@@ -529,14 +495,15 @@
 
 ;; Printing methods
 
+(defmethod print-dup Array1D 
+  ([^Array1D m ^java.io.Writer w]
+   (.write w ^java.lang.String 
+           (str "#ojalgo-clj.core/vector " (.toString m)))))
 
-(defmethod print-dup ojalgo_clj.core.Vector 
-  ([^Vector m ^java.io.Writer w]
-   (.write w ^java.lang.String (.toString m))))
-
-(defmethod print-method ojalgo_clj.core.Vector 
-  ([^Vector m ^java.io.Writer w]
-   (.write w ^java.lang.String (.toString m))))
+(defmethod print-method Array1D 
+  ([^Array1D m ^java.io.Writer w]
+   (.write w ^java.lang.String 
+           (str "#ojalgo-clj.core/vector " (.toString m)))))
 
 (defmethod print-dup ojalgo_clj.core.Matrix 
   ([^Matrix m ^java.io.Writer w]
