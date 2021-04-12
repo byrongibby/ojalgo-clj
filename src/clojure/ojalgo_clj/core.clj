@@ -213,8 +213,7 @@
 
   (toString [this]
     (->> (.toString (.-p64store this))
-         (re-find #"(?is)< \d+ x \d+ >.*" )
-         (str "#"  `Matrix " " )))
+         (re-find #"(?is)< \d+ x \d+ >.*" )))
 
 
 
@@ -495,23 +494,26 @@
 
 ;; Printing methods
 
+
 (defmethod print-dup Array1D 
   ([^Array1D m ^java.io.Writer w]
-   (.write w ^java.lang.String 
-           (str "#ojalgo-clj.core/vector " (.toString m)))))
+   (.write w ^java.lang.String (str "#ojalgo-clj.core/vector " 
+                                    (.toString m)))))
 
 (defmethod print-method Array1D 
   ([^Array1D m ^java.io.Writer w]
-   (.write w ^java.lang.String 
-           (str "#ojalgo-clj.core/vector " (.toString m)))))
+   (.write w ^java.lang.String (str "#ojalgo-clj.core/vector " 
+                                    (.toString m)))))
 
 (defmethod print-dup ojalgo_clj.core.Matrix 
   ([^Matrix m ^java.io.Writer w]
-   (.write w ^java.lang.String (.toString m))))
+   (.write w ^java.lang.String (str "#ojalgo-clj.core/matrix " 
+                                    (.toString m)))))
 
 (defmethod print-method ojalgo_clj.core.Matrix 
   ([^Matrix m ^java.io.Writer w]
-   (.write w ^java.lang.String (.toString m))))
+   (.write w ^java.lang.String (str "#ojalgo-clj.core/matrix " 
+                                    (.toString m)))))
 
 
 
