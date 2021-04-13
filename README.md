@@ -1,5 +1,7 @@
 # ojalgo-clj
 
+[![Clojars Project](https://img.shields.io/clojars/v/ojalgo-clj.svg)](https://clojars.org/ojalgo-clj)
+
 Clojure [core.matrix](https://github.com/mikera/core.matrix) implementation of [oj! Algorithm](https://www.ojalgo.org/) 
 
 ## License
