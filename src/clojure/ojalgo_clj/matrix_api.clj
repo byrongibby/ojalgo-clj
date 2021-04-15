@@ -1,8 +1,10 @@
 (ns ojalgo-clj.matrix-api
-  (:require [clojure.core.matrix.protocols :as mp])
+  (:require [clojure.core.matrix.protocols :as mp]
+            [clojure.core.matrix.utils :refer [error]])
   (:import [ojalgo_clj.core Matrix]
+           [org.ojalgo.matrix.decomposition Cholesky LDL LDU LU QR SingularValue]
            [org.ojalgo.matrix.task DeterminantTask InverterTask SolverTask]
-           [org.ojalgo.matrix.decomposition Cholesky LDL LDU LU QR SingularValue]))
+           [org.ojalgo.matrix.store LowerTriangularStore Primitive64Store]))
 
 ;; ============================================================
 ;; Mathematical operations
@@ -14,14 +16,14 @@
 
   (trace [m]
     (if (apply = (mp/get-shape m))
-      (apply + (.sliceDiagonal (.-p64store m) (long 0) (long 0)))
-      (throw (Exception. "Attempted to calculate the trace of a non-square matrix."))))
+      (apply + (.sliceDiagonal ^Primitive64Store (.-p64store m) (long 0) (long 0)))
+      (error "Attempted to calculate the trace of a non-square matrix.")))
 
   (determinant [m]
     (if (apply = (mp/get-shape m))
       (.calculateDeterminant (.make DeterminantTask/PRIMITIVE (.-p64store m))
                              (.-p64store m))
-      (throw (Exception. "Attempted to calculate the determinant of a non-square matrix."))))
+      (error "Attempted to calculate the determinant of a non-square matrix.")))
 
   (inverse [m]
     (if (apply = (mp/get-shape m))
@@ -30,7 +32,16 @@
                      (.-p64store m))
             (Matrix.))
         (catch Exception _ nil))
-      (throw (Exception. "Attempted to calculate the inverse of a non-square matrix.")))))
+      (error "Attempted to calculate the inverse of a non-square matrix."))))
+
+(extend-protocol mp/PTranspose
+  Matrix
+  (transpose [m]
+    (let [m' (.makeZero Primitive64Store/FACTORY 
+                        (.countColumns ^Primitive64Store (.-p64store m))
+                        (.countRows ^Primitive64Store (.-p64store m)))] 
+      (.supplyTo (.transpose ^Primitive64Store (.-p64store m)) ^Primitive64Store m')
+      (Matrix. m'))))
 
 
 
@@ -38,28 +49,56 @@
 ;; Linear algebra
 
 
-
-(comment
-  (require '[ojalgo-clj.core :refer [create-matrix]])
-  (def m (create-matrix [[1 2] [3 4]])))
-
-(comment
-(extend-protocol mp/PNorm
-  Matrix
-  (norm [m p]))
-
 (extend-protocol mp/PQRDecomposition
   Matrix
   (qr [m options]
-    (let [qr-task (.make QR/PRIMITIVE (.-p64store m))]
-      (.decompose qr-task (.-p64store m))
-      (if (.isSolvable qr-task)
-        (.getSolution (.-p64store m))
-        (throw (RuntimeException. "QR: cannot solve the equation system."))))))
+    (let [{:keys [return compact] 
+           :or {return [:Q :R] compact false}} options
+          qr-decomp (.make QR/PRIMITIVE true)]
+      (when (.decompose qr-decomp (.-p64store m))
+        (select-keys 
+          {:Q (Matrix. (.getQ qr-decomp))
+           :R (when (some #(= :R %) return)
+                (let [R (.makeZero Primitive64Store/FACTORY 
+                                   (if compact
+                                     (min (.countRows ^Primitive64Store (.-p64store m))
+                                          (.countColumns ^Primitive64Store (.-p64store m)))
+                                     (.countRows ^Primitive64Store (.-p64store m)))
+                                   (.countColumns ^Primitive64Store (.-p64store m)))]
+                  (.supplyTo (.getR qr-decomp) ^Primitive64Store R)
+                  (Matrix. R)))}
+          return)))))
 
 (extend-protocol mp/PCholeskyDecomposition
   Matrix
-  (cholesky [m options]))
+  (cholesky [m options]
+    (let [{:keys [return] :or {return [:L :L*]}} options
+          cholesky-decomp (.make Cholesky/PRIMITIVE
+                                 (.countRows ^Primitive64Store (.-p64store m))
+                                 (.countColumns ^Primitive64Store (.-p64store m)))
+          L (.makeZero Primitive64Store/FACTORY 
+                       (.countRows ^Primitive64Store (.-p64store m)) 
+                       (.countColumns ^Primitive64Store (.-p64store m)))]
+      (when (.decompose cholesky-decomp (.-p64store m))
+        (.supplyTo ^LowerTriangularStore (.getL cholesky-decomp) ^Primitive64Store L)
+        (select-keys 
+          {:L (Matrix. L)
+           :L* (when (some #(= :L* %) return)
+                 (let [L* (.makeZero Primitive64Store/FACTORY 
+                                     (.countRows ^Primitive64Store (.-p64store m)) 
+                                     (.countColumns ^Primitive64Store (.-p64store m)))] 
+                   (.supplyTo (.transpose ^Primitive64Store L) ^Primitive64Store L*)
+                   (Matrix. L*)))}
+          return)))))
+
+(comment
+  (require '[ojalgo-clj.core :refer [create-matrix]])
+  (require '[clojure.core.matrix.protocols :as mp])
+  (def m (create-matrix [[5 1] [1 3]])))
+
+(comment
+(extend-protocol PNorm
+  (norm [m p]))
 
 (extend-protocol mp/PLUDecomposition
   Matrix
@@ -1228,30 +1267,14 @@ would often be a numeric base type)."
   (join-rows [ds1 ds2] "Returns a dataset created by combining the rows of the given datasets")
   (join-columns [ds1 ds2] "Returns a dataset created by combining the columns of the given datasets"))
 
-(defprotocol PDatasetMaps
-  (to-map [ds] "Returns map of columns with associated list of values")
-  (row-maps [ds] "Returns seq of maps with row values"))
-
 ;; ============================================================
 ;; Utility functions
 ;;
 ;; Intended for use in protocol implementations
 
-(defn persistent-vector-coerce
-  "Coerces a data structure to nested persistent vectors"
-  [x]
-  (let [dims (long (dimensionality x))]
-    (cond
-      (== dims 0) (get-0d x) ;; first handle scalar / 0d case
-      (clojure.core/vector? x) (mapv convert-to-nested-vectors x)
-      (== dims 1) (vec (element-seq x))
-      #?@(:clj [(instance? List x) (mapv convert-to-nested-vectors x)])
-      (instance? #?(:clj Iterable :cljs IIterable) x) (mapv convert-to-nested-vectors x)
-      (instance? #?(:clj Seqable :cljs ISeqable) x) (mapv convert-to-nested-vectors x)
-      #?@(:clj [(.isArray (class x)) (mapv convert-to-nested-vectors (seq x))])
-      (not (is-scalar? x)) (mapv convert-to-nested-vectors (get-major-slice-seq x))
-      :default (error "Can't coerce to vector: " #?(:clj (class x)
-                                                    :cljs (type x))))))
+(defprotocol PDatasetMaps
+  (to-map [ds] "Returns map of columns with associated list of values")
+  (row-maps [ds] "Returns seq of maps with row values"))
 
 (defn- calc-common-shape
   "Returns the larger of two shapes if they are compatible, nil otherwise"
