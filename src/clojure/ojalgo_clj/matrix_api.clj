@@ -91,18 +91,53 @@
                    (Matrix. L*)))}
           return)))))
 
+(extend-protocol mp/PLUDecomposition
+  Matrix
+  (lu [m options]
+    (let [{:keys [return] :or {return [:L :U :P]}} options
+          lu-decomp (.make LU/PRIMITIVE
+                           (.countRows ^Primitive64Store (.-p64store m))
+                           (.countColumns ^Primitive64Store (.-p64store m)))
+          L (.makeZero Primitive64Store/FACTORY 
+                       (.countRows ^Primitive64Store (.-p64store m)) 
+                       (.countColumns ^Primitive64Store (.-p64store m)))]
+      (when (.decompose lu-decomp (.-p64store m))
+        (.supplyTo ^LowerTriangularStore (.getL lu-decomp) ^Primitive64Store L)
+        (select-keys 
+          {:L (Matrix. L)
+           :U (when (some #(= :U %) return)
+                (let [U (.makeZero Primitive64Store/FACTORY 
+                                   (.countRows ^Primitive64Store (.-p64store m)) 
+                                   (.countColumns ^Primitive64Store (.-p64store m)))] 
+                  (.supplyTo (.getU lu-decomp) ^Primitive64Store U)
+                  (Matrix. U)))
+           :P (when (some #(= :P %) return)
+                (-> (.makeEye Primitive64Store/FACTORY 
+                              (.countRows ^Primitive64Store (.-p64store m)) 
+                              (.countColumns ^Primitive64Store (.-p64store m)))
+                    (Matrix.)))}
+          return)))))
+
+
 (comment
   (require '[ojalgo-clj.core :refer [create-matrix]])
   (require '[clojure.core.matrix.protocols :as mp])
-  (def m (create-matrix [[5 1] [1 3]])))
+  (def m (create-matrix [[5 1] [1 3]]))
+  (def lu-decomp (.make LU/PRIMITIVE
+                           (.countRows ^Primitive64Store (.-p64store m))
+                           (.countColumns ^Primitive64Store (.-p64store m))))
+  (def L (.makeZero Primitive64Store/FACTORY 
+                       (.countRows ^Primitive64Store (.-p64store m)) 
+                       (.countColumns ^Primitive64Store (.-p64store m))))
+  (def U (.makeZero Primitive64Store/FACTORY 
+                                   (.countRows ^Primitive64Store (.-p64store m)) 
+                                   (.countColumns ^Primitive64Store (.-p64store m))))
+  )
+
 
 (comment
 (extend-protocol PNorm
   (norm [m p]))
-
-(extend-protocol mp/PLUDecomposition
-  Matrix
-  (lu [m options]))
 
 (extend-protocol mp/PSVDDecomposition
   Matrix

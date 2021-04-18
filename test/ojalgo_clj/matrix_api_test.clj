@@ -34,7 +34,17 @@
 
 
 
-  
+  (testing "Testing matrix transpose"
+    (let [m (mat/matrix [[1 2] [3 4]])]
+      (is (mat/equals (mat/matrix [[1 3] 
+                                   [2 4]]) 
+                      (mat/transpose m))))
+    (let [m (mat/matrix [[1 2 3 4] [5 6 7 8] [9 10 11 12]])]
+      (is (mat/equals (mat/matrix [[1 5 9] 
+                                   [2 6 10]
+                                   [3 7 11]
+                                   [4 8 12]]) 
+                      (mat/transpose m)))))
 
 
 
@@ -57,29 +67,16 @@
                          [0.0000000 1.6733201]])]
       (is (mat/equals (:L chol) L 1E-6))
       (is (mat/equals (:L* chol) L* 1E-6))))
+
+  (testing "Testing LU decomposition"
+    (let [lu (lin/lu (mat/matrix [[5 1] [1 3]]))
+          L (mat/matrix [[1.0 0.0] 
+                         [0.2 1.0]])
+          U (mat/matrix [[5.0 1.0] 
+                         [0.0 2.8]])]
+      (is (mat/equals (:L lu) L 1E-6))
+      (is (mat/equals (:U lu) U 1E-6))))
 )
 
 
 
-(comment 
-  (let [m (mat/matrix  [[1 2 3 4]
-                        [0 0 10 0]
-                        [3 0 5 6]])
-        {:keys [Q R]} (lin/qr (mat/matrix  [[1 2 3 4]
-                                            [0 0 10 0]
-                                            [3 0 5 6]]))]
-    (println Q)
-    (println R)
-    (is (mat/equals m (mat/mmul Q R) 0.000001)))
-  
-  (testing "Testing matrix transpose"
-    (let [m (mat/matrix [[1 2] [3 4]])]
-      (is (mat/equals (mat/matrix [[1 3] 
-                                   [2 4]]) 
-                      (mat/transpose m))))
-    (let [m (mat/matrix [[1 2 3 4] [5 6 7 8] [9 10 11 12]])]
-      (is (mat/equals (mat/matrix [[1 5 9] 
-                                   [2 6 10]
-                                   [3 7 11]
-                                   [4 8 12]]) 
-                      (mat/transpose m))))))
