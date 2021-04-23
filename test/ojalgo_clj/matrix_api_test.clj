@@ -19,6 +19,12 @@
 
 
 
+  (testing "Testing type information"
+    (let [m (mat/matrix [[1 2] [3 4]])]
+      (is (isa? (mat/element-type m) Double/TYPE))))
+
+
+
   (testing "Testing matrix operations"
     (let [m (mat/matrix [[1 2] [3 4]])]
       (is (== 5.0 (mat/trace m)))
@@ -107,7 +113,7 @@
       (is (mat/equals (:S svd) S 1E-6))
       (is (mat/equals (:V* svd) V* 1E-6)))))
 
-  (testing "Solve linear system of equations"
+  (testing "Testing the solving of a linear system of equations"
     (let [a (mat/matrix [[1 5 6] 
                          [4 6 8]
                          [3 2 2]])
