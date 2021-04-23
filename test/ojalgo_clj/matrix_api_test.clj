@@ -4,12 +4,15 @@
             [clojure.test :refer :all]
             [ojalgo-clj.core :refer :all]))
 
+
+
 (compile 'ojalgo-clj.matrix-api)
 
 (set! *warn-on-reflection* true)
 (set! *unchecked-math* :warn-on-boxed)
 
 (mat/set-current-implementation :ojalgo)
+
 
 
 (deftest optional-protocols-test
@@ -68,6 +71,8 @@
       (is (mat/equals (:L chol) L 1E-6))
       (is (mat/equals (:L* chol) L* 1E-6))))
 
+
+
   (testing "Testing LU decomposition"
     (let [lu (lin/lu (mat/matrix [[5 1] [1 3]]))
           L (mat/matrix [[1.0 0.0] 
@@ -76,6 +81,44 @@
                          [0.0 2.8]])]
       (is (mat/equals (:L lu) L 1E-6))
       (is (mat/equals (:U lu) U 1E-6))))
+
+
+
+  (comment
+    ;; Because SVD decomposition is not unique I think it would
+    ;; be better to test whether X = U S V*, but I need to implement
+    ;; higher level array indexing first, so that I can select the
+    ;; necessary sub-matrix to test the multiplication (should also
+    ;; test whether UU'=I and VV'=I)
+  (testing "Testing SVD decomposition"
+    (let [svd (lin/svd (mat/matrix [[1 5 9] 
+                                    [2 6 10]
+                                    [3 7 11]
+                                    [4 8 12]]))
+          U (mat/matrix [[-0.5045331 -0.76077568  0.4082483] 
+                         [-0.5745157 -0.05714052 -0.8164966]
+                         [-0.6444983  0.64649464  0.4082483]])
+          S (mat/matrix [2.546241E+01 1.290662E+00 1.716561E-15])
+          V* (mat/matrix [[-0.1408767  0.82471435 -0.4991558] 
+                          [-0.3439463  0.42626394  0.4974744]
+                          [-0.5470159  0.02781353  0.5025186]
+                          [-0.7500855 -0.37063688 -0.5008372]])]
+      (is (mat/equals (:U svd) U 1E-6))
+      (is (mat/equals (:S svd) S 1E-6))
+      (is (mat/equals (:V* svd) V* 1E-6)))))
+
+  (testing "Solve linear system of equations"
+    (let [a (mat/matrix [[1 5 6] 
+                         [4 6 8]
+                         [3 2 2]])
+          b (mat/matrix [[1] [2] [3]])
+          c [[1 0 0]
+             [0 1 0]
+             [0 0 1]]]
+      (mat/equals (lin/solve a b) (mat/matrix [[0.750] [2.000] [-1.625]]) 1E-6)
+      (mat/equals (lin/solve a c) (mat/matrix [[-0.250  0.1250  0.250] 
+                                               [ 1.000 -1.0000  1.000]
+                                               [-0.625  0.8125 -0.875]]) 1E-6)))
 )
 
 
