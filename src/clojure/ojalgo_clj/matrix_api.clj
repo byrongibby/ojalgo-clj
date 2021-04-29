@@ -15,6 +15,34 @@
 ;; Optional protocols
 
 
+(extend-protocol mp/PTypeInfo
+  Matrix
+  (element-type [m]
+                Double/TYPE))
+
+(extend-protocol mp/PValidateShape
+  Matrix
+  (validate-shape
+    ([m]
+     [(.countRows ^Primitive64Store (.-p64store m)) 
+      (.countColumns ^Primitive64Store (.-p64store m))]) 
+    ([m expected-shape]
+     (let [shape [(.countRows ^Primitive64Store (.-p64store m)) 
+                  (.countColumns ^Primitive64Store (.-p64store m))]]
+       (if (or (not= (first expected-shape) (first shape))
+               (not= (second expected-shape) (second shape)))
+         (error (str "Matrix does not conform to the expected shape: " expected-shape))
+         shape)))))
+
+(comment
+(extend-protocol mp/PRowColMatrix
+  "Protocol to support construction of row and column matrices from 1D vectors.
+   A vector of length N should be converted to a 1xN or Nx1 matrix respectively.
+   Should throw an error if the data is not a 1D vector"
+  (column-matrix [m data])
+  (row-matrix [m data])))
+
+
 
 ;; ============================================================
 ;; Array assignment and conversion operations
@@ -33,18 +61,15 @@
 
 (extend-protocol mp/PMatrixOps
   Matrix
-
   (trace [m]
     (if (apply = (mp/get-shape m))
       (apply + (.sliceDiagonal ^Primitive64Store (.-p64store m) (long 0) (long 0)))
       (error "Attempted to calculate the trace of a non-square matrix.")))
-
   (determinant [m]
     (if (apply = (mp/get-shape m))
       (.calculateDeterminant (.make DeterminantTask/PRIMITIVE (.-p64store m))
                              (.-p64store m))
       (error "Attempted to calculate the determinant of a non-square matrix.")))
-
   (inverse [m]
     (if (apply = (mp/get-shape m))
       (try 
