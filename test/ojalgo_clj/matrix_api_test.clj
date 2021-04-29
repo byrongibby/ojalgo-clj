@@ -25,6 +25,28 @@
 
 
 
+  (testing "Testing matrix shape validation"
+    (let [m (mat/matrix [[1 2 3 4]
+                         [5 6 7 8]])]
+      (is (= (mat/shape m) (mat/validate-shape m)))
+      (is (= (mat/shape m) (mat/validate-shape m [2 4])))
+      (is (instance? Exception (try (mat/validate-shape m [4 2]) 
+                                    (catch Exception e e))))))
+
+
+
+  (testing "Testing row and column matrix construction from 1D sequence"
+    (let [r1 (mat/row-matrix [1 2 3 4])
+          r2 (mat/row-matrix (mat/matrix [1 2 3 4]))
+          c1 (mat/column-matrix [1 2 3 4])
+          c2 (mat/column-matrix (mat/matrix [1 2 3 4]))]
+      (is (mat/equals (mat/matrix [[1 2 3 4]]) r1))
+      (is (mat/equals r1 r2))
+      (is (mat/equals (mat/matrix [[1] [2] [3] [4]]) c1))
+      (is (mat/equals c1 c2))))
+
+
+
   (testing "Testing matrix operations"
     (let [m (mat/matrix [[1 2] [3 4]])]
       (is (== 5.0 (mat/trace m)))
