@@ -480,15 +480,22 @@
       (.supplyTo (.copy (.transpose (.-p64store m))) (.-p64store m))))
 )
 
-(defn create-matrix [data]
-  (when (and (isa? (class data) java.util.Collection)
-             (every? coll? data)
+(defmulti create-matrix type)
+
+(defmethod create-matrix Matrix [data]
+  data)
+
+(defmethod create-matrix java.util.Collection [data]
+  (when (and (every? coll? data)
              (map  #(every? number? %) data))
     (->> data 
          (map double-array)
          into-array
          (.rows Primitive64Store/FACTORY)
          (Matrix.))))
+
+(defmethod create-matrix :default [data]
+  (create-matrix (mp/convert-to-nested-vectors data)))
 
 
 

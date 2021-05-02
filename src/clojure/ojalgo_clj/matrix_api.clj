@@ -1,6 +1,7 @@
 (ns ojalgo-clj.matrix-api
   (:require [clojure.core.matrix.protocols :as mp]
-            [clojure.core.matrix.utils :refer [error]])
+            [clojure.core.matrix.utils :refer [error]]
+            [ojalgo-clj.core :refer [create-matrix]])
   (:import [ojalgo_clj.core Matrix]
            [org.ojalgo.matrix.decomposition Cholesky LDL LDU LU QR SingularValue]
            [org.ojalgo.matrix.task DeterminantTask InverterTask SolverTask]
@@ -24,11 +25,13 @@
   Matrix
   (validate-shape
     ([m]
-     [(.countRows ^Primitive64Store (.-p64store m)) 
-      (.countColumns ^Primitive64Store (.-p64store m))]) 
+     (let [p ^Primitive64Store (.-p64store m)]
+     [(.countRows p) 
+      (.countColumns p)])) 
     ([m expected-shape]
-     (let [shape [(.countRows ^Primitive64Store (.-p64store m)) 
-                  (.countColumns ^Primitive64Store (.-p64store m))]]
+     (let [p ^Primitive64Store (.-p64store m)
+           shape [(.countRows p) 
+                  (.countColumns p)]]
        (if (or (not= (first expected-shape) (first shape))
                (not= (second expected-shape) (second shape)))
          (error (str "Matrix does not conform to the expected shape: " expected-shape))
@@ -67,26 +70,27 @@
       (error "Attempted to calculate the trace of a non-square matrix.")))
   (determinant [m]
     (if (apply = (mp/get-shape m))
-      (.calculateDeterminant (.make DeterminantTask/PRIMITIVE (.-p64store m))
-                             (.-p64store m))
+      (let [p (.-p64store m)]
+        (.calculateDeterminant (.make DeterminantTask/PRIMITIVE p) p))
       (error "Attempted to calculate the determinant of a non-square matrix.")))
   (inverse [m]
     (if (apply = (mp/get-shape m))
       (try 
-        (-> (.invert (.make InverterTask/PRIMITIVE (.-p64store m))
-                     (.-p64store m))
-            (Matrix.))
+        (let [p (.-p64store m)]
+          (-> (.invert (.make InverterTask/PRIMITIVE p) p)
+              (Matrix.)))
         (catch Exception _ nil))
       (error "Attempted to calculate the inverse of a non-square matrix."))))
 
 (extend-protocol mp/PTranspose
   Matrix
   (transpose [m]
-    (let [m' (.makeZero Primitive64Store/FACTORY 
-                        (.countColumns ^Primitive64Store (.-p64store m))
-                        (.countRows ^Primitive64Store (.-p64store m)))] 
-      (.supplyTo (.transpose ^Primitive64Store (.-p64store m)) ^Primitive64Store m')
-      (Matrix. m'))))
+    (let [p ^Primitive64Store (.-p64store m)
+          p' ^Primitive64Store (.makeZero Primitive64Store/FACTORY 
+                                          (.countColumns p)
+                                          (.countRows p))] 
+      (.supplyTo (.transpose  p) p')
+      (Matrix. p'))))
 
 
 
@@ -117,19 +121,19 @@
 (extend-protocol mp/PQRDecomposition
   Matrix
   (qr [m options]
-    (let [{:keys [return compact] 
+    (let [p ^Primitive64Store (.-p64store m)
+          {:keys [return compact] 
            :or {return [:Q :R] compact false}} options
           qr-decomp (.make QR/PRIMITIVE true)]
-      (when (.decompose qr-decomp (.-p64store m))
+      (when (.decompose qr-decomp p)
         (select-keys 
           {:Q (Matrix. (.getQ qr-decomp))
            :R (when (some #(= :R %) return)
                 (let [R (.makeZero Primitive64Store/FACTORY 
                                    (if compact
-                                     (min (.countRows ^Primitive64Store (.-p64store m))
-                                          (.countColumns ^Primitive64Store (.-p64store m)))
-                                     (.countRows ^Primitive64Store (.-p64store m)))
-                                   (.countColumns ^Primitive64Store (.-p64store m)))]
+                                     (min (.countRows p) (.countColumns p))
+                                     (.countRows p))
+                                   (.countColumns p))]
                   (.supplyTo (.getR qr-decomp) ^Primitive64Store R)
                   (Matrix. R)))}
           return)))))
@@ -137,49 +141,47 @@
 (extend-protocol mp/PCholeskyDecomposition
   Matrix
   (cholesky [m options]
-    (let [{:keys [return] :or {return [:L :L*]}} options
-          cholesky-decomp (.make Cholesky/PRIMITIVE
-                                 (.countRows ^Primitive64Store (.-p64store m))
-                                 (.countColumns ^Primitive64Store (.-p64store m)))
-          L (.makeZero Primitive64Store/FACTORY 
-                       (.countRows ^Primitive64Store (.-p64store m)) 
-                       (.countColumns ^Primitive64Store (.-p64store m)))]
-      (when (.decompose cholesky-decomp (.-p64store m))
-        (.supplyTo ^LowerTriangularStore (.getL cholesky-decomp) ^Primitive64Store L)
+    (let [p ^Primitive64Store (.-p64store m)
+          {:keys [return] :or {return [:L :L*]}} options
+          cholesky-decomp (.make Cholesky/PRIMITIVE p)
+          L  ^Primitive64Store (.makeZero Primitive64Store/FACTORY 
+                                          (.countRows p) 
+                                          (.countColumns p))]
+      (when (.decompose cholesky-decomp p)
+        (.supplyTo ^LowerTriangularStore (.getL cholesky-decomp) L)
         (select-keys 
           {:L (Matrix. L)
            :L* (when (some #(= :L* %) return)
-                 (let [L* (.makeZero Primitive64Store/FACTORY 
-                                     (.countRows ^Primitive64Store (.-p64store m)) 
-                                     (.countColumns ^Primitive64Store (.-p64store m)))] 
-                   (.supplyTo (.transpose ^Primitive64Store L) ^Primitive64Store L*)
+                 (let [L* ^Primitive64Store (.makeZero Primitive64Store/FACTORY 
+                                                       (.countRows p) 
+                                                       (.countColumns p))] 
+                   (.supplyTo (.transpose L) L*)
                    (Matrix. L*)))}
           return)))))
 
 (extend-protocol mp/PLUDecomposition
   Matrix
   (lu [m options]
-    (let [{:keys [return] :or {return [:L :U :P]}} options
-          lu-decomp (.make LU/PRIMITIVE
-                           (.countRows ^Primitive64Store (.-p64store m))
-                           (.countColumns ^Primitive64Store (.-p64store m)))
-          L (.makeZero Primitive64Store/FACTORY 
-                       (.countRows ^Primitive64Store (.-p64store m)) 
-                       (.countColumns ^Primitive64Store (.-p64store m)))]
-      (when (.decompose lu-decomp (.-p64store m))
-        (.supplyTo ^LowerTriangularStore (.getL lu-decomp) ^Primitive64Store L)
+    (let [p ^Primitive64Store (.-p64store m)
+          {:keys [return] :or {return [:L :U :P]}} options
+          lu-decomp (.make LU/PRIMITIVE p)
+          L  ^Primitive64Store(.makeZero Primitive64Store/FACTORY 
+                                         (.countRows p) 
+                                         (.countColumns p))]
+      (when (.decompose lu-decomp p)
+        (.supplyTo ^LowerTriangularStore (.getL lu-decomp) L)
         (select-keys 
           {:L (Matrix. L)
            :U (when (some #(= :U %) return)
-                (let [U (.makeZero Primitive64Store/FACTORY 
-                                   (.countRows ^Primitive64Store (.-p64store m)) 
-                                   (.countColumns ^Primitive64Store (.-p64store m)))] 
-                  (.supplyTo ^UpperTriangularStore (.getU lu-decomp) ^Primitive64Store U)
+                (let [U ^Primitive64Store (.makeZero Primitive64Store/FACTORY 
+                                                     (.countRows p) 
+                                                     (.countColumns p))] 
+                  (.supplyTo ^UpperTriangularStore (.getU lu-decomp) U)
                   (Matrix. U)))
            :P (when (some #(= :P %) return)
                 (-> (.makeEye Primitive64Store/FACTORY 
-                              (.countRows ^Primitive64Store (.-p64store m)) 
-                              (.countColumns ^Primitive64Store (.-p64store m)))
+                              (.countRows p) 
+                              (.countColumns p))
                     (Matrix.)))}
           return)))))
 
@@ -213,10 +215,9 @@
     Matrix
     (solve [a b]
       (try 
-        (let [B (if (instance? Matrix b) b (mp/construct-matrix a (mp/convert-to-nested-vectors b)))]
-          (Matrix. (.solve (.make SolverTask/PRIMITIVE (.-p64store a) (.-p64store B))
-                           (.-p64store a)
-                           (.-p64store B))))
+        (let [p ^Primitive64Store (.-p64store a)
+              q ^Primitive64Store (.-p64store (create-matrix b))]
+          (Matrix. (.solve (.make SolverTask/PRIMITIVE p q) p q)))
         (catch Exception _ nil))))
 
 
