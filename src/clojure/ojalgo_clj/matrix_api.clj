@@ -3,9 +3,9 @@
             [clojure.core.matrix.utils :refer [error]]
             [ojalgo-clj.core :refer [create-matrix]])
   (:import [ojalgo_clj.core Matrix]
-           [org.ojalgo.matrix.decomposition Cholesky LDL LDU LU QR SingularValue]
+           [org.ojalgo.matrix.decomposition Cholesky LU QR SingularValue]
            [org.ojalgo.matrix.task DeterminantTask InverterTask SolverTask]
-           [org.ojalgo.matrix.store DiagonalStore LowerTriangularStore UpperTriangularStore Primitive64Store TransposedStore]))
+           [org.ojalgo.matrix.store Primitive64Store]))
 
 
 (set! *warn-on-reflection* true)
@@ -148,7 +148,7 @@
                                           (.countRows p) 
                                           (.countColumns p))]
       (when (.decompose cholesky-decomp p)
-        (.supplyTo ^LowerTriangularStore (.getL cholesky-decomp) L)
+        (.supplyTo (.getL ^Cholesky cholesky-decomp) L)
         (select-keys 
           {:L (Matrix. L)
            :L* (when (some #(= :L* %) return)
@@ -165,18 +165,18 @@
     (let [p ^Primitive64Store (.-p64store m)
           {:keys [return] :or {return [:L :U :P]}} options
           lu-decomp (.make LU/PRIMITIVE p)
-          L  ^Primitive64Store(.makeZero Primitive64Store/FACTORY 
-                                         (.countRows p) 
-                                         (.countColumns p))]
+          L  ^Primitive64Store (.makeZero Primitive64Store/FACTORY 
+                                          (.countRows p) 
+                                          (.countColumns p))]
       (when (.decompose lu-decomp p)
-        (.supplyTo ^LowerTriangularStore (.getL lu-decomp) L)
+        (.supplyTo (.getL ^LU lu-decomp) L)
         (select-keys 
           {:L (Matrix. L)
            :U (when (some #(= :U %) return)
                 (let [U ^Primitive64Store (.makeZero Primitive64Store/FACTORY 
                                                      (.countRows p) 
                                                      (.countColumns p))] 
-                  (.supplyTo ^UpperTriangularStore (.getU lu-decomp) U)
+                  (.supplyTo (.getU ^LU lu-decomp) U)
                   (Matrix. U)))
            :P (when (some #(= :P %) return)
                 (-> (.makeEye Primitive64Store/FACTORY 
@@ -189,15 +189,16 @@
   (extend-protocol mp/PSVDDecomposition
     Matrix
     (svd [m options]
-      (let [{:keys [return] :or {return [:U :S :V*]}} options
-            svd-decomp (.make SingularValue/PRIMITIVE (.-p64store m))]
-        (when (.decompose svd-decomp (.-p64store m))
+      (let [p ^Primitive64Store (.-p64store m)
+            {:keys [return] :or {return [:U :S :V*]}} options
+            svd-decomp (.make SingularValue/PRIMITIVE p)]
+        (when (.decompose svd-decomp p)
           (cond-> {}
             (some #(= :U %) return) 
             (assoc :U (let [U (.makeZero Primitive64Store/FACTORY 
-                                         (.countRows ^Primitive64Store (.-p64store m)) 
-                                         (.countRows ^Primitive64Store (.-p64store m)))] 
-                        (.supplyTo ^TransposedStore (.getQ1 svd-decomp) ^Primitive64Store U)
+                                         (.countRows p) 
+                                         (.countRows p))] 
+                        (.supplyTo (.getQ1 ^SingularValue svd-decomp) ^Primitive64Store U)
                         (Matrix. U)))
 
             (some #(= :S %) return)
@@ -205,9 +206,9 @@
 
             (some #(= :V* %) return)
             (assoc :V* (let [V* (.makeZero Primitive64Store/FACTORY 
-                                           (.countColumns ^Primitive64Store (.-p64store m)) 
-                                           (.countColumns ^Primitive64Store (.-p64store m)))] 
-                         (.supplyTo ^TransposedStore (.getQ2 svd-decomp) ^Primitive64Store V*)
+                                           (.countColumns p) 
+                                           (.countColumns p))] 
+                         (.supplyTo (.getQ2 ^SingularValue svd-decomp) ^Primitive64Store V*)
                          (Matrix. V*))))))))
 )
 
@@ -215,8 +216,8 @@
     Matrix
     (solve [a b]
       (try 
-        (let [p ^Primitive64Store (.-p64store a)
-              q ^Primitive64Store (.-p64store (create-matrix b))]
+        (let [p (.-p64store a)
+              q (.-p64store ^Matrix (create-matrix b))]
           (Matrix. (.solve (.make SolverTask/PRIMITIVE p q) p q)))
         (catch Exception _ nil))))
 
@@ -233,7 +234,6 @@
 
 
 (comment
-  (require '[ojalgo-clj.core :refer [create-matrix]])
   (require '[clojure.core.matrix.protocols :as mp]))
 
 

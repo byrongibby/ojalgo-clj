@@ -1,6 +1,7 @@
 (ns ojalgo-clj.core
   (:require [clojure.core.matrix.implementations :as mi]
-            [clojure.core.matrix.protocols :as mp])
+            [clojure.core.matrix.protocols :as mp]
+            [clojure.core.matrix.utils :refer [error]])
   (:import [ojalgo-clj.lambda UnaryFn BinaryFn]
            [org.ojalgo.array Array1D]
            [org.ojalgo.matrix.store MatrixStore$LogicalBuilder Primitive64Store]))
@@ -67,7 +68,7 @@
   (dimension-count [m dimension-number]
     (case (int dimension-number)
       0 (.size ^Array1D m)
-      (throw (Exception. "Dimension not supported."))))
+      (error "Dimension not supported.")))
 
 
 
@@ -81,7 +82,7 @@
   (get-nd [m indexes]
     (if (= 1 (count indexes))
       (.get ^Array1D m (long (first indexes)))
-      (throw (Exception. "Attempted to get index not consistent with vector type."))))
+      (error "Attempted to get index not consistent with vector type.")))
 
 
 
@@ -100,7 +101,7 @@
       (let [clone (.copy ^Array1D m)]
         (.set clone (long (first indexes)) (double v))
         clone)
-      (throw (Exception. "Attempted to set index not consistent with vector type."))))
+      (error "Attempted to set index not consistent with vector type.")))
 
   (is-mutable? [m] true)
 
@@ -119,7 +120,7 @@
     (if (= 1 (count indexes))
       (.set ^Array1D m 
           (long (first indexes)) (double v))
-      (throw (Exception. "Attempted to set index not consistent with vector type."))))
+      (error "Attempted to set index not consistent with vector type.")))
 
 
 
@@ -241,30 +242,30 @@
   mp/PImplementation
 
 
-  (implementation-key [m] :ojalgo)
+  (implementation-key [_] :ojalgo)
 
-  (meta-info [m] 
+  (meta-info [_] 
     {:doc "Clojure core.matrix implementation of oj! Algorithm"})
 
-  (construct-matrix [m data]
+  (construct-matrix [_ data]
     (case (mp/dimensionality data)
       1 (create-vector data)
       2 (create-matrix data)
       nil))
 
-  (new-vector [m length]
+  (new-vector [_ length]
     (create-vector (repeat length 0)))
 
-  (new-matrix [m rows columns]
+  (new-matrix [_ rows columns]
     (create-matrix (repeat rows (repeat columns 0))))
 
-  (new-matrix-nd [m shape]
+  (new-matrix-nd [_ shape]
     (case (count shape)
       1 (create-vector (repeat (first shape) 0))
       2 (create-matrix (repeat (first shape) (repeat (second shape) 0)))
       nil))
 
-  (supports-dimensionality? [m dimensions]
+  (supports-dimensionality? [_ dimensions]
     (case dimensions
       1 true
       2 true
@@ -275,28 +276,28 @@
   mp/PDimensionInfo
 
 
-  (dimensionality [m] 2)
+  (dimensionality [_] 2)
 
   (get-shape [m] 
     [(.countRows ^Primitive64Store (.-p64store m)) 
      (.countColumns ^Primitive64Store (.-p64store m))])
 
-  (is-scalar? [m] false)
+  (is-scalar? [_] false)
 
-  (is-vector? [m] false)
+  (is-vector? [_] false)
 
   (dimension-count [m dimension-number]
     (case (int dimension-number)
       0 (.countRows ^Primitive64Store (.-p64store m))
       1 (.countColumns ^Primitive64Store (.-p64store m))
-      (throw (Exception. "Dimension not supported."))))
+      (error "Dimension not supported.")))
 
 
 
   mp/PIndexedAccess
 
 
-  (get-1d [m row])
+  (get-1d [_ _])
 
   (get-2d [m row column] 
     (.get ^Primitive64Store (.-p64store m) (long row) (long column)))
@@ -305,14 +306,14 @@
     (if (= 2 (count indexes))
       (.get ^Primitive64Store (.-p64store m) 
             (long (first indexes)) (long (second indexes)))
-      (throw (Exception. "Attempted to get index not consistent with matrix type."))))
+      (error "Attempted to get index not consistent with matrix type.")))
 
 
 
   mp/PIndexedSetting
 
 
-  (set-1d [m row v])
+  (set-1d [_ _ _])
 
   (set-2d [m row column v]
           (let [clone (.copy ^Primitive64Store (.-p64store m))]
@@ -324,16 +325,16 @@
       (let [clone (.copy ^Primitive64Store (.-p64store m))]
         (.set clone (long (first indexes)) (long (second indexes)) (double v))
         (Matrix. clone))
-      (throw (Exception. "Attempted to set index not consistent with matrix type."))))
+      (error "Attempted to set index not consistent with matrix type.")))
 
-  (is-mutable? [m] true)
+  (is-mutable? [_] true)
 
 
 
   mp/PIndexedSettingMutable
 
 
-  (set-1d! [m row v])
+  (set-1d! [_ _ _])
 
   (set-2d! [m row column v] 
     (.set ^Primitive64Store (.-p64store m) 
@@ -343,7 +344,7 @@
     (if (= 2 (count indexes))
       (.set ^Primitive64Store (.-p64store m) 
             (long (first indexes)) (long (second indexes)) (double v))
-      (throw (Exception. "Attempted to set index not consistent with matrix type."))))
+      (error "Attempted to set index not consistent with matrix type.")))
 
 
 
@@ -443,7 +444,7 @@
   mp/PNumerical
 
 
-  (numerical? [m] true)
+  (numerical? [_] true)
 
 
 

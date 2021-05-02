@@ -1,4 +1,4 @@
-(defproject ojalgo-clj "0.1.1"
+(defproject ojalgo-clj "0.1.1-SNAPSHOT"
   :description "A core.matrix implementation of oj! Algorithms"
   :url "https://github.com/byrongibby/ojalgo-clj"
   :license {:name "EPL-2.0 OR GPL-2.0-or-later WITH Classpath-exception-2.0"
