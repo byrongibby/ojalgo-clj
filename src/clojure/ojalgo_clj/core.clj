@@ -483,9 +483,6 @@
 
 (defmulti create-matrix type)
 
-(defmethod create-matrix Matrix [data]
-  data)
-
 (defmethod create-matrix java.util.Collection [data]
   (when (and (every? coll? data)
              (map  #(every? number? %) data))
@@ -494,6 +491,14 @@
          into-array
          (.rows Primitive64Store/FACTORY)
          (Matrix.))))
+
+(defmethod create-matrix Matrix [data]
+  data)
+
+(defmethod create-matrix Primitive64Store [data]
+  (->> data 
+       (.copy Primitive64Store/FACTORY)
+       (Matrix.)))
 
 (defmethod create-matrix :default [data]
   (create-matrix (mp/convert-to-nested-vectors data)))
